@@ -2,7 +2,7 @@ import os
 from fabric.api import env
 from fabric.contrib.files import upload_template, exists
 from fabric.decorators import task
-from fabric.operations import run, sudo
+from fabric.operations import run, sudo, local
 from fabric.context_managers import cd, prefix
 from fabric.contrib.project import rsync_project
 
@@ -12,6 +12,8 @@ env.project = 'hello'
 env.project_root = os.path.join(env.root, env.project)
 env.virtualenv_root = os.path.join(env.project_root, 'python')
 
+EXCLUDE_FILES = ["python", "*.pyc", ".git", ".gitignore"]
+
 def virtualenv():
     """Return an object, which, when used in a 'with' block, allows commands to be run
     in the Python virtualenv environment"""
@@ -19,7 +21,7 @@ def virtualenv():
     
 def bootstrap():
     run('mkdir -p %(project_root)s' % env)    
-    rsync_project(local_dir='./', remote_dir=env.project_root, exclude=["python", "*.pyc"])
+    rsync_project(local_dir='./', remote_dir=env.project_root, exclude=EXCLUDE_FILES)
     if not exists('%(virtualenv_root)s' % env):
         run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
 
@@ -60,3 +62,12 @@ def deploy():
     setup_nginx()
     setup_supervisor()
     reload_site()
+
+@task
+def setup_local():
+    """Bootstrap the local development environment. You must run this once after checking out the
+    source code from version control"""
+    local('virtualenv --no-site-packages python')
+    local('pip install -E python -r config/requirements.txt')
+
+
