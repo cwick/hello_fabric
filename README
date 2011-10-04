@@ -1,0 +1,11 @@
+This project demonstrates how to use Fabric to deploy a typical Django web application running on nginx and Gunicorn.
+
+Features include:
+    * Isolated deployment environments. Each deploy builds a Python virtualenv from scratch, installing the dependencies listed in requirements.txt. Dependencies are cached so subsequent deploys don't have to download anything.
+    * Allows multiple versions to be kept on the server, and allows rollback to a previously-deployed version.
+    * Config files for server processes such as nginx are stored as templates. When deployed, templates are automatically filled with appropriate values.
+
+
+TODO:
+    -Automatically purge old deployed versions
+    -
