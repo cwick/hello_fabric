@@ -13,6 +13,10 @@ env.project = 'hello'
 
 EXCLUDE_FILES = ["python", "*.pyc", ".git", ".gitignore"]
 
+# Maximum number of versions to keep on the server, including the current version.
+# Previous versions are automatically deleted. Set to a really high number to disable.
+MAX_DEPLOYED_VERSIONS = 4
+
 def pip_download_cache():
     return prefix('export PIP_DOWNLOAD_CACHE=/tmp/pip-download-cache')
 
@@ -32,8 +36,9 @@ def bootstrap():
     env.current_version = os.path.join(env.root, env.project, 'current')
     env.current_virtualenv = os.path.join(env.current_version, virtualenv_dir)
     
-    run('mkdir -p %(project_root)s' % env)    
-    rsync_project(local_dir='./', remote_dir=env.project_root, exclude=EXCLUDE_FILES)
+    run('mkdir -p %(project_root)s' % env)
+    with hide("stdout"):
+        rsync_project(local_dir='./', remote_dir=env.project_root, exclude=EXCLUDE_FILES)
     if not exists('%(virtualenv_root)s' % env):
         run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
 
@@ -68,6 +73,11 @@ def reload_site():
     sudo('service nginx reload')
     sudo('supervisorctl reload')
 
+def purge_old_versions():
+    "Delete old versions if necessary"
+    for v in get_version_list()[MAX_DEPLOYED_VERSIONS:]:
+        run('rm -rf %s/%s/versions/%s' % (env.root, env.project, v))
+        
 def set_current_version(version=None):
     """Create a symlink to the given version, or use the version currently being deployed
     if none given."""
@@ -76,7 +86,8 @@ def set_current_version(version=None):
         run('ln -sfn versions/%s current' % version)
 
 def get_version_list():
-    return run('ls -1t %(root)s/%(project)s/versions' % env).split('\r\n')
+    with hide("everything"):
+        return run('ls -1t %(root)s/%(project)s/versions' % env).split('\r\n')
 
 @task
 def rollback(version=None):
@@ -130,6 +141,7 @@ def deploy():
     setup_supervisor()
     set_current_version()
     reload_site()
+    purge_old_versions()
 
 @task
 def setup_local():
