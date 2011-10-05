@@ -7,5 +7,19 @@ Features include:
     * Config files for server processes such as nginx are stored as templates. When deployed, templates are automatically filled with appropriate values.
     * 
 
+Rollback:
+    The server keeps an archive of the last 'MAX_DEPLOYED_VERSIONS' deploys. Through manipulation of
+    symlinks, the server can change which one is currently the 'live' version. Use these
+    commands to switch between versions.
+    
+    Rollback to the previously-deployed version. Good for those oh-shit-I-just-broke-the-site moments:
+        fab rollback
+    Additional invocations of 'rollback' will go back one more version, until you are at the oldest version.
+
+    Rollback to the latest version:
+        fab rollback:current
+    Rollback to the specified version:
+        fab rollback:<version number>
+        
 TODO:
-    -
+    - Make an archive from version control instead of using rsync

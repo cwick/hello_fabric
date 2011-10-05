@@ -7,8 +7,8 @@ from fabric.context_managers import prefix, hide, cd
 from fabric.contrib.project import rsync_project
 from fabric.utils import abort
 
-env.hosts = ['cwick@newton']
-env.root = '/home/cwick/projects'
+env.hosts = ['deploy@173.255.255.5']
+env.root = '/srv'
 env.project = 'hello'
 
 EXCLUDE_FILES = ["python", "*.pyc", ".git", ".gitignore"]
@@ -73,6 +73,10 @@ def reload_site():
     sudo('service nginx reload')
     sudo('supervisorctl reload')
 
+def get_version_list():
+    with hide("everything"):
+        return run('ls -1t %(root)s/%(project)s/versions' % env).split('\r\n')
+
 def purge_old_versions():
     "Delete old versions if necessary"
     for v in get_version_list()[MAX_DEPLOYED_VERSIONS:]:
@@ -85,32 +89,6 @@ def set_current_version(version=None):
     with cd('%(root)s/%(project)s' % env):
         run('ln -sfn versions/%s current' % version)
 
-def get_version_list():
-    with hide("everything"):
-        return run('ls -1t %(root)s/%(project)s/versions' % env).split('\r\n')
-
-@task
-def rollback(version=None):
-    "Rollback to the specified version"
-    with hide("stdout", "running"):
-        version_list = get_version_list()
-        if len(version_list) == 0:
-            abort("Nothing deployed yet, so can't rollback")
-            
-        if not version:
-            if len(version_list) < 2:
-                abort("No previous version to roll back to")
-            else:
-                version = version_list[1]
-        elif version == "current":
-            version = version_list[0]
-        else:
-            if version not in version_list:
-                abort("Invalid version %s. Try the 'version_list' command" % version)
-        
-    set_current_version(version_list[1])
-    reload_site()
-
 def get_current_version():
     "Get the currently deployed version"
     with hide("everything"):
@@ -120,6 +98,33 @@ def get_current_version():
             return match.groups()[0]
         else:
             return None
+        
+@task
+def rollback(version=None):
+    "Rollback to a previous version"
+    with hide("stdout", "running"):
+        version_list = get_version_list()
+        if len(version_list) == 0:
+            abort("Nothing deployed yet, so can't rollback")
+            
+        if not version:
+            cur_version = get_current_version()
+            next_idx = version_list.index(cur_version) + 1
+            if next_idx >= len(version_list):
+                abort("No previous version to roll back to")
+            else:
+                version = version_list[next_idx]
+        elif version == "current":
+            version = version_list[0]
+        else:
+            if version not in version_list:
+                abort("Invalid version %s. Try the 'version_list' command" % version)
+        
+    set_current_version(version)
+    reload_site()
+    print "Current version is now %s" % version
+
+
 
 @task
 def version_list():
