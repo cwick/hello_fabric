@@ -8,7 +8,6 @@ from fabric.contrib.files import upload_template
 from fabric.decorators import task, runs_once
 from fabric.operations import run, sudo, local, put
 from fabric.context_managers import prefix, hide, cd, settings
-from fabric.contrib.project import rsync_project
 from fabric.utils import abort
 
 env.hosts = ['deploy@173.255.255.5']

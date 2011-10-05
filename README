@@ -38,6 +38,6 @@ Rollback:
         fab rollback:current
     Rollback to the specified version:
         fab rollback:<version number>
-        
+    
 TODO:
-    - Make an archive from version control instead of using rsync
+    - 
