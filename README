@@ -5,7 +5,7 @@ Features include:
     * Allows multiple versions to be kept on the server, and allows rollback to a previously-deployed version.
     * Old versions are automatically purged from the server (configurable).
     * Config files for server processes such as nginx are stored as templates. When deployed, templates are automatically filled with appropriate values.
-    * 
+    * Deployment operation is atomic. The entire deploy process must succeed, or else the server configuration is not modified.
 
 
 Initial server setup:
@@ -41,4 +41,3 @@ Rollback:
         
 TODO:
     - Make an archive from version control instead of using rsync
-    - Cleanup after a failed deploy

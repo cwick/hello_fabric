@@ -1,4 +1,6 @@
 import os, time, re
+from datetime import datetime, timedelta
+
 from fabric.api import env
 from fabric.colors import red, green
 from fabric.contrib.console import confirm
@@ -22,6 +24,16 @@ MAX_DEPLOYED_VERSIONS = 4
 NGINX_CONFIG_FILE = '/etc/nginx/sites-available/%(project)s' % env
 SUPERVISOR_CONFIG_FILE = '/etc/supervisor/conf.d/%(project)s.conf' % env
 
+################################################################################
+# Utility functions
+################################################################################        
+def pretty_timedelta(delta):
+    delta = timedelta(delta.days, delta.seconds)
+    return "%s (HH:MM:SS)" % str(delta)
+        
+def parse_timestamp(version):
+    return datetime.strptime(version, "%Y_%m_%d_%H%M%S")
+    
 def pip_download_cache():
     "Returns a command prefix which enables the pip download cache."
     return prefix('export PIP_DOWNLOAD_CACHE=/tmp/pip-download-cache')
@@ -30,34 +42,6 @@ def virtualenv():
     """Return an object, which, when used in a 'with' block, allows commands to be run
     in the Python virtualenv environment"""
     return prefix('source %s' % os.path.join(env.virtualenv_root, 'bin', 'activate'))
-    
-def bootstrap():
-    # Construct paths that refer to the version currently being deployed
-    virtualenv_dir = 'python'
-    env.version = time.strftime('%Y_%m_%d_%H%M%S')
-    env.project_root = os.path.join(env.root, env.project, 'versions', env.version)
-    env.virtualenv_root = os.path.join(env.project_root, virtualenv_dir)
-
-    # Construct paths that always refer to the current version
-    env.current_version = os.path.join(env.root, env.project, 'current')
-    env.current_virtualenv = os.path.join(env.current_version, virtualenv_dir)
-    
-    run('mkdir -p %(project_root)s' % env)
-    with hide("stdout"):
-        print "Uploading application..."
-        rsync_project(local_dir='./', remote_dir=env.project_root, exclude=EXCLUDE_FILES)
-
-    print "Creating Python environment..."
-    run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
-
-def install_pip_packages():
-    """ Installs dependencies with pip """
-    with virtualenv():
-        with pip_download_cache():
-            with hide('stdout'):
-                print "Installing dependencies..."
-                run('cd %(project_root)s && pip install -r config/requirements.txt' % env)
-        
 
 def restore_file_from_backup(filename, use_sudo=False):
     bak = "%s.bak" % filename
@@ -70,6 +54,9 @@ def restore_file_from_backup(filename, use_sudo=False):
             else:
                 run(cmd)
 
+################################################################################
+# Configuration file management
+################################################################################        
 def setup_nginx():
     upload_template(
         'config/nginx.conf' % env,
@@ -89,6 +76,40 @@ def setup_supervisor():
         backup=True
     )
 
+################################################################################
+# Initialization
+################################################################################        
+def initialize_environment():
+    # Construct paths that refer to the version currently being deployed
+    virtualenv_dir = 'python'
+    env.version = time.strftime('%Y_%m_%d_%H%M%S')
+    env.project_root = os.path.join(env.root, env.project, 'versions', env.version)
+    env.virtualenv_root = os.path.join(env.project_root, virtualenv_dir)
+
+    # Construct paths that always refer to the current version
+    env.current_version = os.path.join(env.root, env.project, 'current')
+    env.current_virtualenv = os.path.join(env.current_version, virtualenv_dir)
+
+def bootstrap():
+    run('mkdir -p %(project_root)s' % env)
+    with hide("stdout"):
+        print "Uploading application..."
+        rsync_project(local_dir='./', remote_dir=env.project_root, exclude=EXCLUDE_FILES)
+
+    print "Creating Python environment..."
+    run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
+
+def install_pip_packages():
+    """ Installs dependencies with pip """
+    with virtualenv():
+        with pip_download_cache():
+            with hide('stdout'):
+                print "Installing dependencies..."
+                run('cd %(project_root)s && pip install -r config/requirements.txt' % env)
+    
+################################################################################
+# Version management
+################################################################################        
 def reload_site():
     print "Reloading services..."
     sudo('service nginx reload')
@@ -120,6 +141,9 @@ def get_current_version():
         else:
             return None
 
+################################################################################
+# Cleanup
+################################################################################        
 @runs_once
 def cleanup():
     "Cleanup temporary files used during deploy"
@@ -145,10 +169,14 @@ def recover_from_failed_deploy():
         print red("The server may be in an inconsistent state. Execute a successful deploy to fix.")    
 
 
-    
+################################################################################
+# Task definitions
+################################################################################    
 @task
 def rollback(version=None):
     "Rollback to a previous version"
+
+    # Gather verion numbers and make sure it's a valid rollback
     with hide("stdout", "running"):
         version_list = get_version_list()        
         if len(version_list) == 0:
@@ -156,30 +184,38 @@ def rollback(version=None):
 
         cur_version = get_current_version()
         if not version:
+            # Rollback by one
             next_idx = version_list.index(cur_version) + 1
             if next_idx >= len(version_list):
                 abort("You are already at the oldest version")
             else:
                 version = version_list[next_idx]
         elif version == "current":
+            # Jump to the most recently deployed version
             version = version_list[0]
+            if version == cur_version:
+                abort("You are already at the most recently deployed version")
         else:
+            # Unknown version number
             if version not in version_list:
                 abort("Invalid version %s. Try the 'version_list' command" % version)
 
-    from datetime import datetime
-    new_timestamp = datetime.strptime(version, "%Y_%m_%d_%H%M%S")
-    old_timestamp = datetime.strptime(cur_version, "%Y_%m_%d_%H%M%S")
+        if version == cur_version:
+            abort("%s is already the active version." % version)
+
+    # Figure out if we're going backwards or forwards in time
+    new_timestamp = parse_timestamp(version)
+    old_timestamp = parse_timestamp(cur_version)
     delta = abs(old_timestamp - new_timestamp)
     if old_timestamp > new_timestamp:
         age = "older"
     else:
         age = "newer"
-        
+
     print "Current version is %s" % green(cur_version)
-    print "I will rollback to version %s, which is %s by %s (HH:MM:SS)" % (version, age, delta)
+    print "I will rollback to version %s, which is %s by %s" % (version, age, pretty_timedelta(delta))
     
-    if confirm("Proceed?", default=False):
+    if confirm("Proceed with rollback?", default=False):
         set_current_version(version)
         reload_site()
         print "Current version is now %s" % version
@@ -199,7 +235,16 @@ def version_list():
 @task
 def deploy():
     "Deploy code to the server"
+    initialize_environment()
+    old_timestamp = parse_timestamp(get_current_version())
+    
+    print "Ready to deploy version %s. The last deploy happened %s ago." \
+        % (env.version, pretty_timedelta(datetime.now() - old_timestamp))
+    if not confirm("Proceed with deploy?", default=False):
+        return
+    
     try:
+        start_time = datetime.now()
         bootstrap()
         install_pip_packages()
         setup_nginx()
@@ -213,7 +258,8 @@ def deploy():
         recover_from_failed_deploy()
     finally:
         cleanup()
-        purge_old_versions()        
+        purge_old_versions()
+        print "Deploy took %s" % (pretty_timedelta(datetime.now() - start_time))
 
 @task
 def setup_local():
