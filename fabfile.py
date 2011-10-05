@@ -1,9 +1,11 @@
 import os, time, re
 from fabric.api import env
-from fabric.contrib.files import upload_template, exists
-from fabric.decorators import task
+from fabric.colors import red, green
+from fabric.contrib.console import confirm
+from fabric.contrib.files import upload_template
+from fabric.decorators import task, runs_once
 from fabric.operations import run, sudo, local
-from fabric.context_managers import prefix, hide, cd
+from fabric.context_managers import prefix, hide, cd, settings
 from fabric.contrib.project import rsync_project
 from fabric.utils import abort
 
@@ -17,7 +19,11 @@ EXCLUDE_FILES = ["python", "*.pyc", ".git", ".gitignore"]
 # Previous versions are automatically deleted. Set to a really high number to disable.
 MAX_DEPLOYED_VERSIONS = 4
 
+NGINX_CONFIG_FILE = '/etc/nginx/sites-available/%(project)s' % env
+SUPERVISOR_CONFIG_FILE = '/etc/supervisor/conf.d/%(project)s.conf' % env
+
 def pip_download_cache():
+    "Returns a command prefix which enables the pip download cache."
     return prefix('export PIP_DOWNLOAD_CACHE=/tmp/pip-download-cache')
 
 def virtualenv():
@@ -38,17 +44,31 @@ def bootstrap():
     
     run('mkdir -p %(project_root)s' % env)
     with hide("stdout"):
+        print "Uploading application..."
         rsync_project(local_dir='./', remote_dir=env.project_root, exclude=EXCLUDE_FILES)
-    if not exists('%(virtualenv_root)s' % env):
-        run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
+
+    print "Creating Python environment..."
+    run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
 
 def install_pip_packages():
     """ Installs dependencies with pip """
     with virtualenv():
         with pip_download_cache():
             with hide('stdout'):
+                print "Installing dependencies..."
                 run('cd %(project_root)s && pip install -r config/requirements.txt' % env)
         
+
+def restore_file_from_backup(filename, use_sudo=False):
+    bak = "%s.bak" % filename
+    cmd = "mv %s %s" % (bak, filename)
+    
+    with settings(warn_only=True):
+        with hide('stdout', 'warnings'):
+            if use_sudo:
+                sudo(cmd)
+            else:
+                run(cmd)
 
 def setup_nginx():
     upload_template(
@@ -56,7 +76,7 @@ def setup_nginx():
         '/etc/nginx/sites-available/%(project)s' % env,
         use_sudo=True,
         context=env,
-        backup=False
+        backup=True
     )
     sudo('ln -sfn ../sites-available/%(project)s /etc/nginx/sites-enabled/%(project)s' % env)
 
@@ -66,10 +86,11 @@ def setup_supervisor():
         '/etc/supervisor/conf.d/%(project)s.conf' % env,
         use_sudo=True,
         context=env,
-        backup=False
+        backup=True
     )
 
 def reload_site():
+    print "Reloading services..."
     sudo('service nginx reload')
     sudo('supervisorctl reload')
 
@@ -98,20 +119,46 @@ def get_current_version():
             return match.groups()[0]
         else:
             return None
-        
+
+@runs_once
+def cleanup():
+    "Cleanup temporary files used during deploy"
+    sudo('rm -f %s.bak' % NGINX_CONFIG_FILE)
+    sudo('rm -f %s.bak' % SUPERVISOR_CONFIG_FILE)
+
+def recover_from_failed_deploy():
+    try:
+        print red("Deploy failed. I will now attempt to recover...")
+        run('rm -rf %(root)s/%(project)s/versions/%(version)s' % env)
+        restore_file_from_backup(NGINX_CONFIG_FILE, use_sudo=True)
+        restore_file_from_backup(SUPERVISOR_CONFIG_FILE, use_sudo=True)
+        versions = get_version_list()
+        if versions:
+            set_current_version(versions[0])
+
+        reload_site()
+            
+        print red("Server should now be in the state it was before the deploy failed.")
+        print red("However, you should run a successful deploy to make sure nothing is broken.")
+    except:
+        print red("An error occured while attempting to clean up the last deploy.")
+        print red("The server may be in an inconsistent state. Execute a successful deploy to fix.")    
+
+
+    
 @task
 def rollback(version=None):
     "Rollback to a previous version"
     with hide("stdout", "running"):
-        version_list = get_version_list()
+        version_list = get_version_list()        
         if len(version_list) == 0:
             abort("Nothing deployed yet, so can't rollback")
-            
+
+        cur_version = get_current_version()
         if not version:
-            cur_version = get_current_version()
             next_idx = version_list.index(cur_version) + 1
             if next_idx >= len(version_list):
-                abort("No previous version to roll back to")
+                abort("You are already at the oldest version")
             else:
                 version = version_list[next_idx]
         elif version == "current":
@@ -119,17 +166,29 @@ def rollback(version=None):
         else:
             if version not in version_list:
                 abort("Invalid version %s. Try the 'version_list' command" % version)
+
+    from datetime import datetime
+    new_timestamp = datetime.strptime(version, "%Y_%m_%d_%H%M%S")
+    old_timestamp = datetime.strptime(cur_version, "%Y_%m_%d_%H%M%S")
+    delta = abs(old_timestamp - new_timestamp)
+    if old_timestamp > new_timestamp:
+        age = "older"
+    else:
+        age = "newer"
         
-    set_current_version(version)
-    reload_site()
-    print "Current version is now %s" % version
+    print "Current version is %s" % green(cur_version)
+    print "I will rollback to version %s, which is %s by %s (HH:MM:SS)" % (version, age, delta)
+    
+    if confirm("Proceed?", default=False):
+        set_current_version(version)
+        reload_site()
+        print "Current version is now %s" % version
 
 
 
 @task
 def version_list():
     "Print versions available on the server."
-    from fabric.colors import green
     current_version = get_current_version()
     with hide("everything"):
         for v in get_version_list():
@@ -140,13 +199,21 @@ def version_list():
 @task
 def deploy():
     "Deploy code to the server"
-    bootstrap()
-    install_pip_packages()
-    setup_nginx()
-    setup_supervisor()
-    set_current_version()
-    reload_site()
-    purge_old_versions()
+    try:
+        bootstrap()
+        install_pip_packages()
+        setup_nginx()
+        setup_supervisor()
+        set_current_version()
+        reload_site()
+    except Exception, e:
+        print e
+        recover_from_failed_deploy()
+    except:
+        recover_from_failed_deploy()
+    finally:
+        cleanup()
+        purge_old_versions()        
 
 @task
 def setup_local():
