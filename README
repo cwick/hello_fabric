@@ -7,6 +7,24 @@ Features include:
     * Config files for server processes such as nginx are stored as templates. When deployed, templates are automatically filled with appropriate values.
     * 
 
+
+Initial setup:
+    Not automated right now. You should use 'apt' to install the following packages:
+        * nginx
+        * supervisor
+        * gcc
+        * python
+
+    You will also need a user called 'deploy', who has read and write access to '/srv/<project name>/'.
+    You need to set up public key authentication with SSH so you can run commands as the 'deploy' user
+    without having to enter a password.
+
+
+Deploy:
+    fab deploy
+
+    Deploy a new version to the server.
+    
 Rollback:
     The server keeps an archive of the last 'MAX_DEPLOYED_VERSIONS' deploys. Through manipulation of
     symlinks, the server can change which one is currently the 'live' version. Use these
@@ -23,3 +41,4 @@ Rollback:
         
 TODO:
     - Make an archive from version control instead of using rsync
+    - Cleanup after a failed deploy
