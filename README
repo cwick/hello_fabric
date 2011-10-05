@@ -5,7 +5,7 @@ Features include:
     * Allows multiple versions to be kept on the server, and allows rollback to a previously-deployed version.
     * Old versions are automatically purged from the server (configurable).
     * Config files for server processes such as nginx are stored as templates. When deployed, templates are automatically filled with appropriate values.
-    * Deployment operation is atomic. The entire deploy process must succeed, or else the server configuration is not modified.
+    * Deployments are atomic. The entire deploy process must succeed, or else the server configuration is not modified.
 
 
 Initial server setup:
@@ -34,7 +34,7 @@ Rollback:
         fab rollback
     Additional invocations of 'rollback' will go back one more version, until you are at the oldest version.
 
-    Rollback to the latest version:
+    Rollback to the most recently deployed version:
         fab rollback:current
     Rollback to the specified version:
         fab rollback:<version number>
