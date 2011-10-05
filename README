@@ -8,7 +8,7 @@ Features include:
     * 
 
 
-Initial setup:
+Initial server setup:
     Not automated right now. You should use 'apt' to install the following packages:
         * nginx
         * supervisor
