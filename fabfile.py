@@ -6,7 +6,7 @@ from fabric.colors import red, green
 from fabric.contrib.console import confirm
 from fabric.contrib.files import upload_template
 from fabric.decorators import task, runs_once
-from fabric.operations import run, sudo, local
+from fabric.operations import run, sudo, local, put
 from fabric.context_managers import prefix, hide, cd, settings
 from fabric.contrib.project import rsync_project
 from fabric.utils import abort
@@ -32,7 +32,7 @@ def pretty_timedelta(delta):
     return "%s (HH:MM:SS)" % str(delta)
         
 def parse_timestamp(version):
-    return datetime.strptime(version, "%Y_%m_%d_%H%M%S")
+    return datetime.strptime(version, "%Y_%m_%d_%H%M%S") if version is not None else None
     
 def pip_download_cache():
     "Returns a command prefix which enables the pip download cache."
@@ -55,8 +55,25 @@ def restore_file_from_backup(filename, use_sudo=False):
                 run(cmd)
 
 ################################################################################
-# Configuration file management
+# Deploy
 ################################################################################        
+def deploy_app_archive():
+    import tempfile
+    try:
+        print "Creating app bundle..."
+        temp = tempfile.NamedTemporaryFile(delete=False)
+        temp.write(local("git archive master --format=zip", capture=True))
+        temp.close()
+
+        remote_bundle = "%(project_root)s/%(project)s.zip" % env 
+        print "Uploading app bundle..."
+        put(temp.name, remote_bundle)
+        with hide("stdout"):
+            run("cd %s && unzip %s" % (env.project_root, remote_bundle))
+    finally:
+        os.remove(temp.name)
+        run("rm -f %s" % remote_bundle)
+    
 def setup_nginx():
     upload_template(
         'config/nginx.conf' % env,
@@ -78,7 +95,21 @@ def setup_supervisor():
 
 ################################################################################
 # Initialization
-################################################################################        
+################################################################################    
+def confirm_deploy():
+    old_timestamp = parse_timestamp(get_current_version())
+
+    message = "Ready to deploy version %s. %s"
+    
+    if old_timestamp is None:
+        message = message % (env.version, "There are no previous versions.")
+    else:
+        message = message % (env.version, "The last deploy happened %s ago." \
+            % pretty_timedelta(datetime.now() - old_timestamp))
+
+    print message
+    return confirm("Proceed with deploy?", default=False)
+    
 def initialize_environment():
     # Construct paths that refer to the version currently being deployed
     virtualenv_dir = 'python'
@@ -92,15 +123,11 @@ def initialize_environment():
 
 def bootstrap():
     run('mkdir -p %(project_root)s' % env)
-    with hide("stdout"):
-        print "Uploading application..."
-        rsync_project(local_dir='./', remote_dir=env.project_root, exclude=EXCLUDE_FILES)
-
+    
+def create_python_environment():
     print "Creating Python environment..."
     run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
 
-def install_pip_packages():
-    """ Installs dependencies with pip """
     with virtualenv():
         with pip_download_cache():
             with hide('stdout'):
@@ -135,17 +162,18 @@ def get_current_version():
     "Get the currently deployed version"
     with hide("everything"):
         cmd = "file %(root)s/%(project)s/current" % env
-        match = re.search(r'([0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{6})', run(cmd))
-        if match:
-            return match.groups()[0]
-        else:
-            return None
+        with settings(warn_only=True):
+            match = re.search(r'([0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{6})', run(cmd))
+            if match:
+                return match.groups()[0]
+            else:
+                return None
 
 ################################################################################
 # Cleanup
 ################################################################################        
 @runs_once
-def cleanup():
+def cleanup_server():
     "Cleanup temporary files used during deploy"
     sudo('rm -f %s.bak' % NGINX_CONFIG_FILE)
     sudo('rm -f %s.bak' % SUPERVISOR_CONFIG_FILE)
@@ -236,17 +264,15 @@ def version_list():
 def deploy():
     "Deploy code to the server"
     initialize_environment()
-    old_timestamp = parse_timestamp(get_current_version())
     
-    print "Ready to deploy version %s. The last deploy happened %s ago." \
-        % (env.version, pretty_timedelta(datetime.now() - old_timestamp))
-    if not confirm("Proceed with deploy?", default=False):
+    if not confirm_deploy():
         return
     
     try:
         start_time = datetime.now()
         bootstrap()
-        install_pip_packages()
+        deploy_app_archive()        
+        create_python_environment()
         setup_nginx()
         setup_supervisor()
         set_current_version()
@@ -257,7 +283,7 @@ def deploy():
     except:
         recover_from_failed_deploy()
     finally:
-        cleanup()
+        cleanup_server()
         purge_old_versions()
         print "Deploy took %s" % (pretty_timedelta(datetime.now() - start_time))
 
