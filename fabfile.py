@@ -29,13 +29,19 @@ SUPERVISOR_CONFIG_FILE = '/etc/supervisor/conf.d/%(project)s.conf' % env
 ################################################################################
 # Lock functions
 ################################################################################        
-def acquire_lock():
-    with settings(warn_only=True):
-        result = sudo("mkdir %s" % LOCK_DIR)
-        if result.succeeded:
-            sudo("echo %s > %s/user.txt" % (env.user_string, LOCK_DIR))
+def acquire_lock(wait=False):
+    "Try to acquire the deploy lock. If wait=True, wait for the lock to become free."
+    while True:
+        with settings(warn_only=True):
+            with hide("everything"):
+                result = sudo("mkdir %s" % LOCK_DIR)
+                if result.succeeded:
+                    sudo("echo %s > %s/user.txt" % (env.user_string, LOCK_DIR))
 
-        return result.succeeded
+        if not wait or result.succeeded:
+            return result.succeeded
+
+        time.sleep(10)
 
 def release_lock():
     with settings(warn_only=True):
@@ -293,8 +299,9 @@ def deploy(force=False):
         return
 
     if not force and not acquire_lock():
-        abort("%s is already in the process of deploying. Please wait for them to finish." \
-            % get_lock_info())
+        print("%s is already in the process of deploying. I will wait for them " \
+            "and then proceed with the deployment. Press Ctrl-C to cancel." % get_lock_info())
+        acquire_lock(wait=True)
             
     try:
         start_time = datetime.now()
