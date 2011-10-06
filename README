@@ -6,7 +6,7 @@ Features include:
     * Old versions are automatically purged from the server (configurable).
     * Config files for server processes such as nginx are stored as templates. When deployed, templates are automatically filled with appropriate values.
     * Deployments are atomic. The entire deploy process must succeed, or else the server configuration is not modified.
-    * Detection of concurrent deploys. If another developer is already deploying, the script will wait for them to finish before proceeding
+    * Detection of concurrent deploys. Deploy will fail if somebody is already in the process of deploying
 
 
 Initial server setup:
