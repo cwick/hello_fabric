@@ -319,6 +319,8 @@ def deploy(force=False):
     finally:
         cleanup_server()
         purge_old_versions()
+
+        # Very important that this comes last!
         release_lock()
         
         print "Deploy took %s" % (pretty_timedelta(datetime.now() - start_time))
