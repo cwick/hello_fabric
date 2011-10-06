@@ -98,36 +98,15 @@ def confirm_deploy():
 
 def bootstrap():
     run('mkdir -p %(project_root)s' % env)
-    # Find the previous deploy, if any, so we can refer to it later
-    env.prev_version = get_current_version()
-    if env.prev_version:
-        env.prev_project_root = os.path.join(env.root, env.project, 'versions', env.prev_version)
-        env.prev_virtualenv_root = os.path.join(env.prev_project_root, VIRTUALENV_DIR)
-
-def virtualenv_changed():
-    "Return True if we need to rebuild the virtualenv"
-    if not env.prev_version:
-        return True
-    
-    with hide('stdout'):
-        return bool(run("diff %(project_root)s/config/requirements.txt "
-                        "%(prev_project_root)s/config/requirements.txt" % env))
-        
+       
 def create_python_environment():
-    # See if we can reuse a previous virtualenv
-    if virtualenv_changed():
-        print "Creating Python environment..."
-        run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
-        #run('virtualenv --relocatable %(virtualenv_root)s' % env)
-        
+    print "Creating Python environment..."
+    run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
 
-        with virtualenv():
-            with pip_download_cache():
-                print "Installing dependencies..."
-                run('cd %(project_root)s && pip install -r config/requirements.txt' % env)
-    else:
-        print "No changed detected in virtualenv, so I will reuse the previous one..."
-        run('cp -Ra %(prev_virtualenv_root)s %(virtualenv_root)s' % env)
+    with virtualenv():
+        with pip_download_cache():
+            print "Installing dependencies..."
+            run('cd %(project_root)s && pip install -r config/requirements.txt' % env)
     
 ################################################################################
 # Version management
