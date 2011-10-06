@@ -313,10 +313,8 @@ def deploy(force=False):
         setup_supervisor()
         set_current_version()
         reload_site()
-    except Exception, e:
+    except BaseException, e:
         print e
-        recover_from_failed_deploy()
-    except:
         recover_from_failed_deploy()
     finally:
         cleanup_server()
