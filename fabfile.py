@@ -1,4 +1,5 @@
-import os, time, re
+import os, time, re, socket
+import StringIO
 from datetime import datetime, timedelta
 
 from fabric.api import env
@@ -6,15 +7,17 @@ from fabric.colors import red, green
 from fabric.contrib.console import confirm
 from fabric.contrib.files import upload_template
 from fabric.decorators import task, runs_once
-from fabric.operations import run, sudo, local, put
+from fabric.operations import run, sudo, local, put, get
 from fabric.context_managers import prefix, hide, cd, settings
 from fabric.utils import abort
 
 env.hosts = ['deploy@173.255.255.5']
 env.root = '/srv'
 env.project = 'hello'
-
+env.user_string = "%s@%s" % (env.local_user, socket.gethostname())
+    
 EXCLUDE_FILES = ["python", "*.pyc", ".git", ".gitignore"]
+LOCK_DIR = "/var/run/%(project)s-deploy" % env
 
 # Maximum number of versions to keep on the server, including the current version.
 # Previous versions are automatically deleted. Set to a really high number to disable.
@@ -23,6 +26,28 @@ MAX_DEPLOYED_VERSIONS = 4
 NGINX_CONFIG_FILE = '/etc/nginx/sites-available/%(project)s' % env
 SUPERVISOR_CONFIG_FILE = '/etc/supervisor/conf.d/%(project)s.conf' % env
 
+################################################################################
+# Lock functions
+################################################################################        
+def acquire_lock():
+    with settings(warn_only=True):
+        result = sudo("mkdir %s" % LOCK_DIR)
+        if result.succeeded:
+            sudo("echo %s > %s/user.txt" % (env.user_string, LOCK_DIR))
+
+        return result.succeeded
+
+def release_lock():
+    with settings(warn_only=True):
+        sudo("rm -rf %s" % LOCK_DIR)
+
+def get_lock_info():
+    buf = StringIO.StringIO()
+    with hide("running"):
+        get("%s/user.txt" % LOCK_DIR, local_path=buf)
+        
+    return buf.getvalue().strip("\n")
+    
 ################################################################################
 # Utility functions
 ################################################################################        
@@ -260,15 +285,20 @@ def version_list():
             else:
                 print v
 @task
-def deploy():
+def deploy(force=False):
     "Deploy code to the server"
     initialize_environment()
     
     if not confirm_deploy():
         return
-    
+
+    if not force and not acquire_lock():
+        abort("%s is already in the process of deploying. Please wait for them to finish." \
+            % get_lock_info())
+            
     try:
         start_time = datetime.now()
+            
         bootstrap()
         deploy_app_archive()        
         create_python_environment()
@@ -284,6 +314,8 @@ def deploy():
     finally:
         cleanup_server()
         purge_old_versions()
+        release_lock()
+        
         print "Deploy took %s" % (pretty_timedelta(datetime.now() - start_time))
 
 @task
