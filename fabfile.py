@@ -26,6 +26,9 @@ MAX_DEPLOYED_VERSIONS = 4
 NGINX_CONFIG_FILE = '/etc/nginx/sites-available/%(project)s' % env
 SUPERVISOR_CONFIG_FILE = '/etc/supervisor/conf.d/%(project)s.conf' % env
 
+# Directory to use to store the Python virtualenv
+VIRTUALENV_DIR = 'python'
+
 ################################################################################
 # Lock functions
 ################################################################################        
@@ -136,27 +139,41 @@ def confirm_deploy():
     
 def initialize_environment():
     # Construct paths that refer to the version currently being deployed
-    virtualenv_dir = 'python'
     env.version = time.strftime('%Y_%m_%d_%H%M%S')
     env.project_root = os.path.join(env.root, env.project, 'versions', env.version)
-    env.virtualenv_root = os.path.join(env.project_root, virtualenv_dir)
+    env.virtualenv_root = os.path.join(env.project_root, VIRTUALENV_DIR)
 
     # Construct paths that always refer to the current version
     env.current_version = os.path.join(env.root, env.project, 'current')
-    env.current_virtualenv = os.path.join(env.current_version, virtualenv_dir)
+    env.current_virtualenv = os.path.join(env.current_version, VIRTUALENV_DIR)
 
 def bootstrap():
     run('mkdir -p %(project_root)s' % env)
-    
-def create_python_environment():
-    print "Creating Python environment..."
-    run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
+    # Find the previous deploy, if any, so we can refer to it later
+    env.prev_version = get_current_version()
+    if env.prev_version:
+        env.prev_project_root = os.path.join(env.root, env.project, 'versions', env.prev_version)
+        env.prev_virtualenv_root = os.path.join(env.prev_project_root, VIRTUALENV_DIR)
 
-    with virtualenv():
-        with pip_download_cache():
-            with hide('stdout'):
+def virtualenv_changed():
+    "Return True if we need to rebuild the virtualenv"
+    with hide('stdout'):
+        return bool(run("diff %(project_root)s/config/requirements.txt "
+                        "%(prev_project_root)s/config/requirements.txt" % env))
+        
+def create_python_environment():
+    # See if we can reuse a previous virtualenv
+    if virtualenv_changed():
+        print "Creating Python environment..."
+        run('virtualenv --no-site-packages %(virtualenv_root)s' % env)
+
+        with virtualenv():
+            with pip_download_cache():
                 print "Installing dependencies..."
                 run('cd %(project_root)s && pip install -r config/requirements.txt' % env)
+    else:
+        print "No changed detected in virtualenv, so I will reuse the previous one..."
+        run('cp -Ra %(prev_virtualenv_root)s %(virtualenv_root)s' % env)
     
 ################################################################################
 # Version management
