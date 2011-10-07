@@ -277,3 +277,10 @@ def setup_local():
     local('pip install -E python -r config/requirements.txt')
 
 
+@task
+def manage(cmd=""):
+    "Run a django management command"
+    initialize_environment()
+    with virtualenv(env.current_virtualenv):
+        with cd("%(current_django)s" % env):
+            run("python manage.py %s" % cmd)
