@@ -1,4 +1,4 @@
-class ssh {
+class provision {
     user { "cwick":
          ensure => present,
          comment => "Carmen Wick",
@@ -47,6 +47,13 @@ class ssh {
         mode   => 644,
         owner  => "root",
         group  => "root",
-        source => "puppet:///modules/ssh/dhcpcd",
+        source => "puppet:///modules/provision/dhcpcd",
+    }
+
+    file { "/etc/sudoers":
+        owner  => root,
+        group  => root,
+        mode   => 440,
+        source => "puppet:///modules/provision/sudoers",
     }
 }
