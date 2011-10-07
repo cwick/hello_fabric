@@ -26,6 +26,27 @@ class ssh {
         hasrestart => true,
         hasstatus  => true,
         # Automatically restart when config file changes
-        subscribe  => File['/etc/ssh/sshd_config'],
+        subscribe  => File["/etc/ssh/sshd_config"],
+    }
+
+    file { "/etc/hostname":
+        ensure => file,
+        mode   => 644,
+        owner  => "root",
+        group  => "root",
+        content => "newton\n"
+    }
+
+    exec { "/bin/hostname -F /etc/hostname":
+        subscribe   => File["/etc/hostname"],
+        refreshonly => true
+    }
+
+    file { "/etc/default/dhcpcd":
+        ensure => file,
+        mode   => 644,
+        owner  => "root",
+        group  => "root",
+        source => "puppet:///modules/ssh/dhcpcd",
     }
 }
