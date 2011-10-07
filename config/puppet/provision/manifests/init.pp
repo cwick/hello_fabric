@@ -29,6 +29,15 @@ class provision {
         subscribe  => File["/etc/ssh/sshd_config"],
     }
 
+    file { "/etc/hosts":
+        ensure   => file,
+        mode     => 644,
+        owner    => "root",
+        group    => "root",
+        content  => template("provision/hosts.erb"),
+        before   => File["/etc/hostname"],
+    }
+    
     file { "/etc/hostname":
         ensure => file,
         mode   => 644,
