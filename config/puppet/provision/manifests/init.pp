@@ -1,4 +1,4 @@
-class provision {
+class provision ($hostname) {
     ############################################################################
     # Set up users and SSH access
     ############################################################################
@@ -50,7 +50,7 @@ class provision {
         mode   => 644,
         owner  => "root",
         group  => "root",
-        content => "newton\n"
+        content => "${hostname}\n"
     }
 
     exec { "/bin/hostname -F /etc/hostname":
