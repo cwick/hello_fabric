@@ -17,7 +17,7 @@ class provision {
         mode   => 644,
         owner  => "root",
         group  => "root",
-        source => "puppet:///modules/ssh/sshd_config",
+        source => "puppet:///modules/provision/sshd_config",
     }
 
     service { "ssh":
