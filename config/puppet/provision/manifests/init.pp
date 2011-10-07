@@ -1,8 +1,9 @@
 class provision {
     user { "cwick":
-         ensure => present,
-         comment => "Carmen Wick",
+         ensure     => present,
+         comment    => "Carmen Wick",
          managehome => true,
+         shell      => "/bin/bash",
     }
 
     ssh_authorized_key { "carmen@icecube":
