@@ -1,0 +1,3 @@
+class {"provision":
+    hostname => "newton",
+}
