@@ -1,4 +1,7 @@
 class provision {
+    ############################################################################
+    # Set up users and SSH access
+    ############################################################################
     user { "cwick":
          ensure     => present,
          comment    => "Carmen Wick",
@@ -30,6 +33,9 @@ class provision {
         subscribe  => File["/etc/ssh/sshd_config"],
     }
 
+    ############################################################################
+    # Set system hostname
+    ############################################################################
     file { "/etc/hosts":
         ensure   => file,
         mode     => 644,
@@ -60,6 +66,22 @@ class provision {
         source => "puppet:///modules/provision/dhcpcd",
     }
 
+    ############################################################################
+    # Set up timezone and locale
+    ############################################################################
+    file { "/etc/localtime":
+        ensure => "/usr/share/zoneinfo/America/Los_Angeles",
+    } 
+    file { "/etc/timezone":
+        content => "America/Los_Angeles\n", 
+    } 
+    file { "/etc/default/locale":
+        content => "LANG=\"en_US.UTF-8\"",
+    }
+    
+    ############################################################################
+    # Misc stuff
+    ############################################################################    
     file { "/etc/sudoers":
         owner  => root,
         group  => root,
