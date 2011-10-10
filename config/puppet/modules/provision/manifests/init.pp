@@ -177,9 +177,14 @@ class provision ($hostname) {
     # Misc stuff
     ############################################################################    
     file { "/etc/sudoers":
-        owner  => root,
-        group  => root,
+        owner  => "root",
+        group  => "root",
         mode   => 440,
         source => "puppet:///modules/provision/sudoers",
+    }
+    file {"/srv":
+        ensure => directory,
+        owner  => "deploy",
+        group  => "deploy",
     }
 }
