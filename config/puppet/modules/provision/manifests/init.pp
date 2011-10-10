@@ -2,18 +2,31 @@ class provision ($hostname) {
     ############################################################################
     # Set up users and SSH access
     ############################################################################
+    $my_public_key = "AAAAB3NzaC1yc2EAAAADAQABAAABAQDgcXorY4YazGbaMG3nv0bVJ7ykpANIrGc4WRR8H7uol2fb5PD0SyPoEeE/PIUX0vnaleG1vqz9C4O7Ykz2ktC/O1R4T0Cu5lEhPKzkSMxFiG5DtQuIMezDIbpD/AoEBqQYHhdJiL+fGTsyZ+PE6lnSsKK71O4A2Tj3l8qxediWFjMpGqpKzWlSNAKr/7uBo0v4JsmGz8Oa80MLozFpDOTY2fiN9eW2pm6zEDufzejHU78g/EqYyrLbyLhvy2Z+QlqA1QFi3XHHC0+a71zYm7aSGhsCFCzk0j2NQVFsPZOyBfTTQLcQupzkZDxijYyoOtQ5Ufg04BIzmJ8xHpvPyIcl"
+    
     user { "cwick":
          ensure     => present,
-         comment    => "Carmen Wick",
          managehome => true,
          shell      => "/bin/bash",
     }
 
+    user { "deploy":
+         ensure     => present,
+         managehome => true,
+         shell      => "/bin/bash",
+    }
+    
     ssh_authorized_key { "carmen@icecube":
         ensure => present,
-        key => "AAAAB3NzaC1yc2EAAAADAQABAAABAQDgcXorY4YazGbaMG3nv0bVJ7ykpANIrGc4WRR8H7uol2fb5PD0SyPoEeE/PIUX0vnaleG1vqz9C4O7Ykz2ktC/O1R4T0Cu5lEhPKzkSMxFiG5DtQuIMezDIbpD/AoEBqQYHhdJiL+fGTsyZ+PE6lnSsKK71O4A2Tj3l8qxediWFjMpGqpKzWlSNAKr/7uBo0v4JsmGz8Oa80MLozFpDOTY2fiN9eW2pm6zEDufzejHU78g/EqYyrLbyLhvy2Z+QlqA1QFi3XHHC0+a71zYm7aSGhsCFCzk0j2NQVFsPZOyBfTTQLcQupzkZDxijYyoOtQ5Ufg04BIzmJ8xHpvPyIcl",
+        key => my_public_key,
         type => "ssh-rsa",
         user => "cwick",
+    }
+    ssh_authorized_key { "carmen@icecube":
+        ensure => present,
+        key => my_public_key,
+        type => "ssh-rsa",
+        user => "deploy",
     }
 
     file { "/etc/ssh/sshd_config":
