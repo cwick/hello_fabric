@@ -82,9 +82,6 @@ class provision ($hostname) {
     ############################################################################
     # Install packages
     ############################################################################
-    exec { "apt-get update":
-        path => "/usr/bin",
-    }
     package { "nginx":
         ensure => present
     }
@@ -109,7 +106,6 @@ class provision ($hostname) {
     package { "openjdk-6-jre-headless":
         ensure => present
     }
-    Package { require => Exec["apt-get update"] }
 
     ############################################################################
     # Install Solr

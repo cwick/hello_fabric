@@ -1,6 +1,8 @@
 #!/bin/bash
 cd
-apt-get install git puppet
+apt-get update -y
+apt-get upgrade -y
+apt-get install git puppet -y
 rm -rf hello_fabric
 git clone git://github.com/cwick/hello_fabric.git
 rm -rf /etc/puppet/modules/*
