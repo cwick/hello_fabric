@@ -122,6 +122,14 @@ class provision ($hostname) {
     package { "openjdk-6-jre-headless":
         ensure => present
     }
+    package { "supervisor":
+        require => Exec["meld3"],
+    }
+    exec { "pip install -U meld3":
+        path    => "/usr/bin",
+        alias   => "meld3",
+        require => Package["python-pip"],
+    }
 
     ############################################################################
     # Install Solr
