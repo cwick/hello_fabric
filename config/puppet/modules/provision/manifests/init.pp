@@ -18,13 +18,13 @@ class provision ($hostname) {
     
     ssh_authorized_key { "carmen@icecube":
         ensure => present,
-        key => my_public_key,
+        key => $my_public_key,
         type => "ssh-rsa",
         user => "cwick",
     }
     ssh_authorized_key { "carmen-deploy@icecube":
         ensure => present,
-        key => my_public_key,
+        key => $my_public_key,
         type => "ssh-rsa",
         user => "deploy",
     }
