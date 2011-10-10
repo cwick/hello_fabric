@@ -183,6 +183,17 @@ class provision ($hostname) {
         hasrestart => true,
         hasstatus  => true,
     }
+
+    ############################################################################
+    # Configure nginx
+    ############################################################################
+    service { "nginx":
+        require    => Package["nginx"],
+        ensure     => running,
+        enable     => true,
+        hasrestart => true,
+        hasstatus  => true,
+    }
     
     ############################################################################
     # Misc stuff
