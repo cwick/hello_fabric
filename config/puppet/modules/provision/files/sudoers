@@ -17,6 +17,7 @@ Defaults:ALL timestamp_timeout=15
 # User privilege specification
 root    ALL = (ALL:ALL) NOPASSWD: ALL
 cwick   ALL = (ALL:ALL) NOPASSWD: ALL
+deploy  ALL = (ALL:ALL) NOPASSWD: ALL
 
 # Allow members of group sudo to execute any command after they have
 # provided their password
