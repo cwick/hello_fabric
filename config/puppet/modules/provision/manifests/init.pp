@@ -71,12 +71,97 @@ class provision ($hostname) {
     ############################################################################
     file { "/etc/localtime":
         ensure => "/usr/share/zoneinfo/America/Los_Angeles",
-    } 
+    }
     file { "/etc/timezone":
         content => "America/Los_Angeles\n", 
-    } 
+    }
     file { "/etc/default/locale":
         content => "LANG=\"en_US.UTF-8\"",
+    }
+
+    ############################################################################
+    # Install packages
+    ############################################################################
+    exec { "apt-get update":
+        path => "/usr/bin",
+    }
+    package { "nginx":
+        ensure => present
+    }
+    package { "python":
+        ensure => present
+    }
+    package { "python-pip":
+        ensure => present
+    }
+    package { "python-dev":
+        ensure => present
+    }
+    package { "postgresql":
+        ensure => present
+    }
+    package { "libpq-dev":
+        ensure => present
+    }
+    package { "memcached":
+        ensure => present
+    }
+    package { "openjdk-6-jre-headless":
+        ensure => present
+    }
+    Package { require => Exec["apt-get update"] }
+
+    ############################################################################
+    # Install Solr
+    ############################################################################
+    $solr_url = "http://www.takeyellow.com/apachemirror/lucene/solr/3.4.0/"
+    $solr_version = "apache-solr-3.4.0"
+    $solr_archive = "apache-solr-3.4.0.zip"
+
+    user { "solr": ensure => present }
+    file { "/usr/local/src": ensure => directory }
+    exec { "wget ${solr_url}${solr_archive} -O /usr/local/src/${solr_archive}":
+        creates => "/usr/local/src/${solr_archive}",
+        alias   => "download-solr",
+        require => File["/usr/local/src"],
+        path    => "/usr/bin",
+    }
+    exec { "unzip ${solr_archive}":
+        alias   => "unzip-solr",
+        cwd     => "/usr/local/src",
+        creates => "/usr/local/src/${solr_version}",
+        require => [Exec["download-solr"], Package["unzip"]],
+        path    => "/usr/bin",
+    }
+    file { "/opt/solr":
+        ensure  => directory,
+        owner   => "solr",
+        group   => "solr",
+        mode    => 644,
+        recurse => true,
+        require => Exec["install-solr"],
+    }
+    exec { "cp -R ${solr_version}/example/ /opt/solr/":
+        creates => "/opt/solr/",
+        alias   => "install-solr",
+        path    => "/bin",
+        require => Exec["unzip-solr"],
+        cwd     => "/usr/local/src",
+    }
+    package { "unzip":
+        ensure => present,
+    }
+    
+    ############################################################################
+    # Configure memcached
+    ############################################################################
+    # Each application will manage its own memcached instance
+    service { "memcached":
+        require    => Package["memcached"],
+        ensure     => stopped,
+        enable     => false,
+        hasrestart => true,
+        hasstatus  => true,
     }
     
     ############################################################################
