@@ -107,6 +107,9 @@ class provision ($hostname) {
     package { "python-dev":
         ensure => present
     }
+    package { "python-virtualenv":
+        ensure => present
+    }
     package { "postgresql":
         ensure => present
     }
