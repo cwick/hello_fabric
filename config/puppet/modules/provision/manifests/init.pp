@@ -179,8 +179,9 @@ class provision ($hostname) {
     service { "memcached":
         require    => Package["memcached"],
         ensure     => stopped,
+        status     => "ls /var/run/memcached.pid",
         enable     => false,
-        hasrestart => true,
+        hasrestart => false,
         hasstatus  => true,
     }
 
