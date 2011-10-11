@@ -1,5 +1,7 @@
+from hello import settings as djsettings
+
 from fabric.api import env
-from fabric.context_managers import cd
+from fabric.context_managers import cd, settings
 from fabric.decorators import task
 from fabric.operations import run, sudo
 
@@ -18,5 +20,9 @@ def syncdb():
 
 @task
 def create():
-    "Create the application database"
-    sudo("createdb %(project)s" % env, user="postgres")
+    "Create the application database and user"
+    with settings(warn_only=True):
+        sudo("createdb %(project)s" % env, user="postgres")
+        sudo("psql -c \"CREATE USER %s WITH PASSWORD '%s'\"" % (
+                djsettings.DATABASES['default']['USER'],
+                djsettings.DATABASES['default']['PASSWORD']), user="postgres")

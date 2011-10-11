@@ -194,6 +194,17 @@ class provision ($hostname) {
         hasrestart => true,
         hasstatus  => true,
     }
+
+    ############################################################################
+    # Configure postgresql
+    ############################################################################
+    postgres::database { "cwick":
+        ensure => present
+    }
+    postgres::role { "cwick":
+        ensure    => present,
+        superuser => true,
+    }
     
     ############################################################################
     # Misc stuff
