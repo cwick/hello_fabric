@@ -200,11 +200,13 @@ class provision ($hostname) {
     # Configure postgresql
     ############################################################################
     postgres::database { "cwick":
-        ensure => present
+        ensure  => present,
+        require => Package["postgresql"],
     }
     postgres::role { "cwick":
         ensure    => present,
         superuser => true,
+        require   => Package["postgresql"],
     }
     
     ############################################################################
