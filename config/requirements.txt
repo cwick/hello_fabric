@@ -5,3 +5,15 @@ paramiko==1.7.7.1
 psycopg2==2.4.1
 pycrypto==2.3
 wsgiref==0.1.2
+
+# Testing with a lot of dependencies
+-e git://github.com/instantautomatic/django-facebook.git@282718505c8a32780689d14a55a12fde814afee7#egg=django_facebook
+-e git://github.com/hiidef/soundcloud-python.git#egg=soundcloud_python
+-e git://github.com/facebook/python-sdk.git#egg=python_sdk
+-e hg+https://bitbucket.org/tomchristie/django-rest-framework#egg=django_rest_framework
+-e git://github.com/django-debug-toolbar/django-debug-toolbar.git#egg=django_debug_toolbar
+-e git://github.com/jezdez/django_compressor.git#egg=django_compressor
+-e git://github.com/sunlightlabs/validictory.git#egg=validictory
+-e git://github.com/shelfworthy/minidetector.git#egg=minidetector
+-e git://github.com/django-extensions/django-extensions.git#egg=django_extensions
+-e git://github.com/jc/python-lastfm.git#egg=python_lastfm
