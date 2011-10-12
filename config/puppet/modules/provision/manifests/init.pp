@@ -95,6 +95,12 @@ class provision ($hostname) {
     ############################################################################
     # Install packages
     ############################################################################
+    package { "git":
+        ensure => present
+    }
+    package { "mercurial":
+        ensure => present
+    }
     package { "nginx":
         ensure => present
     }
